@@ -1,0 +1,24 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Install VSCode-R-Debugger",
+      "type": "shell",
+      "command": "/usr/bin/R",
+      "args": [
+        "--no-restore",
+        "--quiet",
+        "-f",
+        "${env:HOME}/.vscode/extensions/rdebugger.r-debugger-0.5.5/R/install.R",
+        "--args",
+        "https://github.com/ManuelHentschel/VSCode-R-Debugger/releases/download/v0.5.5/vscDebugger_0.5.2.tar.gz"
+      ],
+      "options": {
+        "env": {
+          "R_LIBS_USER": "${env:HOME}/R/library"
+        }
+      },
+      "problemMatcher": []
+    }
+  ]
+}
