@@ -616,6 +616,10 @@ kurtosis(rowSums(sOX))
 # 產生個別化學習分析報告 (HTML 格式)
 # ===============================================
 
+# ---- 控制變數：是否在班級S-P Chart中顯示其他同學的匿名作答 (O/X) ----
+show_classmates_responses_in_sp_chart <- TRUE # 設定為 TRUE 以顯示，FALSE 則只顯示顏色背景
+# --------------------------------------------------------------------
+
 # 檢查 'student' 矩陣是否存在且包含必要欄位
 if (!exists("student") || !all(c("姓名", "班級", "座號", "答對率", "問題注意係數", "判定類別") %in% colnames(student))) {
   stop("必要的 'student' 矩陣或其欄位不存在，無法產生個別報告。請確認先前的分析已正確執行。")
@@ -679,11 +683,51 @@ for (k in 1:stuNum) {
                          "th, td{border: 1px solid #ddd; padding: 10px; text-align: left;}",
                          "th{background-color: #007bff; color: white;}",
                          "tr:nth-child(even){background-color: #f9f9f9;}",
-                         ".container{max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);}",
+                         ".container{max-width: 90%; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);}",
                          ".info-box{background-color: #e7f3fe; border-left: 6px solid #2196F3; margin-bottom: 15px; padding: 10px 12px;}",
                          "ul {list-style-type: none; padding-left: 0;}",
                          "li b {color: #0056b3;}",
                          ".footer {text-align: center; margin-top: 30px; font-size: 0.9em; color: #777;}",
+                         # CSS for Bar Chart 
+                         ".chart-container { margin-top: 25px; margin-bottom: 25px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; }",
+                         ".chart-container h4 { margin-top:0; margin-bottom: 15px; color: #0056b3; text-align: center; font-size: 1.1em;}",
+                         ".chart-bar-group { display: flex; align-items: center; margin-bottom: 10px; }",
+                         ".bar-label { width: 140px; font-size: 0.85em; color: #495057; padding-right: 10px; text-align: right; flex-shrink: 0;}",
+                         ".bar-wrapper { flex-grow: 1; background-color: #e9ecef; border-radius: 4px; height: 22px; position: relative;}",
+                         ".bar { height: 100%; line-height: 22px; color: white; text-align: right; padding-right: 8px; border-radius: 4px; white-space: nowrap; overflow: hidden; font-size: 0.8em; box-sizing: border-box; transition: width 0.5s ease-in-out;}",
+                         ".student-bar { background-color: #28a745; }", # Green 
+                         ".class-bar { background-color: #ffc107; }",   # Yellow
+                         ".overall-bar { background-color: #17a2b8; }", # Teal 
+                         # CSS for Scatter Plot 
+                         ".scatter-plot-container { margin-top: 30px; margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; }",
+                         ".scatter-plot-title { margin-top:0; margin-bottom: 15px; color: #0056b3; text-align: center; font-size: 1.1em;}",
+                         ".scatter-plot-main-area { display: flex; align-items: center; justify-content: center; }",
+                         ".y-axis-label-scatter { writing-mode: vertical-rl; margin-right: 10px; font-size: 0.9em; color: #333; text-align: center; }",
+                         ".scatter-plot-area { border: 1px solid #ccc; border-left: 2px solid #555; border-bottom: 2px solid #555; position: relative; background-color: white; }", # Removed width and height
+                         ".scatter-d-zero-line { position: absolute; bottom: 50%; left: 0; width: 100%; height: 1px; background-color: #ddd; z-index: 0; }",
+                         ".scatter-point { position: absolute; width: 24px; height: 24px; background-color: rgba(220, 53, 69, 0.7); color: white; border: 1px solid rgba(220, 53, 69, 0.9); border-radius: 50%; font-size: 0.7em; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); z-index: 1; box-shadow: 1px 1px 3px rgba(0,0,0,0.2); cursor: default; }",
+                         ".x-axis-label-scatter { text-align: center; margin-top: 8px; font-size: 0.9em; color: #333; }",
+                         # Axis tick labels (simple) 
+                         ".y-axis-tick-label { position: absolute; left: -30px; font-size: 0.7em; color: #555; width: 25px; text-align: right; }",
+                         ".x-axis-tick-label { position: absolute; bottom: -20px; font-size: 0.7em; color: #555; text-align: center; }",
+                         ".tick-d-1 { top: -5px; }", # D=1.0 
+                         ".tick-d-0 { top: calc(50% - 7px); }", # D=0.0 
+                         ".tick-d-neg-1 { bottom: -5px; }", # D=-1.0 
+                         ".tick-p-0 { left: -5px; }", # P=0.0 
+                         ".tick-p-05 { left: calc(50% - 10px); }", # P=0.5 
+                         ".explanation-box { background-color: #f0f8ff; border: 1px solid #add8e6; padding: 10px 15px; margin-top: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 0.9em; }",
+                         ".tick-p-1 { right: -5px; left: auto; }", # P=1.0 
+                         # CSS for SP Chart 
+                         ".sp-chart-container { margin-top: 30px; margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; overflow-x: auto; }",
+                         ".sp-chart-title { margin-top:0; margin-bottom: 15px; color: #0056b3; text-align: center; font-size: 1.1em;}",
+                         ".sp-table { border-collapse: collapse; margin: 0 auto; }",
+                         ".sp-table th, .sp-table td { border: 1px solid #ddd; min-width: 8px; height: 8px; text-align: center; font-size: 0.70em; padding: 2px; }", # Adjusted min-width, height, and font-size
+                         ".sp-table th.sp-q-header { white-space: nowrap; /* Keep question numbers from wrapping */ }",
+                         ".sp-table td.sp-correct { background-color: #e9f5e9; }", # Light green for correct 
+                         ".sp-table td.sp-incorrect { background-color: #fdecea; }", # Light red for incorrect 
+                         ".sp-table tr.current-student-row td { border-top: 2px solid #007bff; border-bottom: 2px solid #007bff; }",
+                         ".sp-table td.current-student-cell { font-weight: bold; }",
+                         ".sp-table td.current-student-incorrect { background-color: #ffc0cb; color: #a52a2a; font-weight: bold; }", # Pink for current student incorrect 
                          "</style>")
   html_content <- paste0(html_content, "</head><body><div class='container'>")
   
@@ -701,14 +745,54 @@ for (k in 1:stuNum) {
   html_content <- paste0(html_content, "<li><b>您的得分 (答對題數/總題數)：</b>", student_num_correct_k, " / ", queNum, 
                          " (答對率: ", round(student_correct_rate_k * 100, 1), "%)</li>")
   if (!is.na(class_avg_k) && length(class_avg_k) > 0) {
-    html_content <- paste0(html_content, "<li><b>您班級的平均得分：</b>", round(class_avg_k, 1), " 分 (全體 ", length(score[class==student_class_k & !is.na(score)]), " 位)</li>")
+    html_content <- paste0(html_content, "<li><b>您班級的平均得分：</b>", round(class_avg_k, 1), " 分 (全班 ", length(score[class==student_class_k & !is.na(score)]), " 班)</li>")
   } else {
     html_content <- paste0(html_content, "<li><b>您班級的平均得分：</b>資料暫缺</li>")
   }
   html_content <- paste0(html_content, "<li><b>全體平均得分：</b>", round(overall_avg, 1), " 分 (全體 ", length(score[!is.na(score)]), " 位)</li>")
   html_content <- paste0(html_content, "</ul>")
 
+  # --- CSS 長條圖 ---
+  student_rate_percent <- round(student_correct_rate_k * 100, 1)
+  class_avg_rate_percent <- NA
+  if (!is.na(class_avg_k) && queNum > 0) {
+    class_avg_rate_percent <- round(class_avg_k,1)
+  }
+  overall_avg_rate_percent <- NA
+  if (!is.na(overall_avg) && queNum > 0) {
+    overall_avg_rate_percent <- round(overall_avg,1)
+  }
+
+  html_content <- paste0(html_content, "<div class='chart-container'><h4>成績比較圖 (答對率 %)</h4>")
+  # 您的答對率
+  html_content <- paste0(html_content, "<div class='chart-bar-group'>")
+  html_content <- paste0(html_content, "<span class='bar-label'>您的答對率:</span>")
+  html_content <- paste0(html_content, "<div class='bar-wrapper'><div class='bar student-bar' style='width:", student_rate_percent, "%;'>", student_rate_percent, "%</div></div>")
+  html_content <- paste0(html_content, "</div>")
+  # 班級平均答對率
+  if (!is.na(class_avg_rate_percent)) {
+    html_content <- paste0(html_content, "<div class='chart-bar-group'>")
+    html_content <- paste0(html_content, "<span class='bar-label'>班級平均答對率:</span>")
+    html_content <- paste0(html_content, "<div class='bar-wrapper'><div class='bar class-bar' style='width:", class_avg_rate_percent, "%;'>", class_avg_rate_percent, "%</div></div>")
+    html_content <- paste0(html_content, "</div>")
+  }
+  # 全體平均答對率
+  if (!is.na(overall_avg_rate_percent)) {
+    html_content <- paste0(html_content, "<div class='chart-bar-group'>")
+    html_content <- paste0(html_content, "<span class='bar-label'>全體平均答對率:</span>")
+    html_content <- paste0(html_content, "<div class='bar-wrapper'><div class='bar overall-bar' style='width:", overall_avg_rate_percent, "%;'>", overall_avg_rate_percent, "%</div></div>")
+    html_content <- paste0(html_content, "</div>")
+  }
+  html_content <- paste0(html_content, "</div>") # end chart-container
+
   # 答錯題目詳情
+  html_content <- paste0(html_content, "<div class='explanation-box'>",
+                         "<h4>關於「題目難度」與「題目鑑別度」：</h4>",
+                         "<p><b>題目難度 (P值)：</b>代表這道題目對所有參與測驗的同學來說有多容易。P值越高 (越接近1.0)，表示題目越簡單，答對的人越多；P值越低 (越接近0.0)，表示題目越困難，答對的人越少。</p>",
+                         "<ul><li>P值 > 0.8：通常表示非常簡單的題目。</li><li>P值 0.5 ~ 0.8：表示中等偏易的題目。</li><li>P值 0.2 ~ 0.5：表示中等偏難的題目。</li><li>P值 < 0.2：通常表示非常困難的題目。</li></ul>",
+                         "<p><b>題目鑑別度 (D值)：</b>代表這道題目能不能有效地區分出學習表現較好和較弱的同學。D值越高 (越接近1.0)，表示這題越能讓高分群答對、低分群答錯；D值接近0或負數，表示高分群反而容易答錯。</p>",
+                         "<p>當您查看下方答錯的題目時，可以參考這些指標，了解您錯的題目是屬於哪種類型。</p>",
+                         "</div>")
   html_content <- paste0(html_content, "<h3>答錯題目詳情</h3>")
   if (length(incorrect_q_actual_numbers) > 0) {
     html_content <- paste0(html_content, "<table><tr><th>題號</th><th>您的答案</th><th>正確答案</th><th>題目難度(P)</th><th>題目鑑別度(D)</th></tr>")
@@ -737,6 +821,145 @@ for (k in 1:stuNum) {
   } else {
     html_content <- paste0(html_content, "<p>恭喜！您所有題目都答對了，或沒有被記錄為錯誤的題目。</p>")
   }
+
+  # --- CSS 散佈圖 (答錯題目之難度 vs 鑑別度) ---
+  if (length(incorrect_q_actual_numbers) > 0) {
+    plot_width_px <- 600
+    plot_height_px <- 400
+
+    html_content <- paste0(html_content, "<div class='scatter-plot-container'>")
+    html_content <- paste0(html_content, "<h4 class='scatter-plot-title'>答錯題目 難度-鑑別度分佈圖</h4>")
+    html_content <- paste0(html_content, "<div class='scatter-plot-main-area'>") # Flex container for Y-label and plot
+    html_content <- paste0(html_content, "<div class='y-axis-label-scatter'>題目鑑別度</div>")
+    html_content <- paste0(html_content, "<div class='scatter-plot-area' style='width:", plot_width_px, "px; height:", plot_height_px, "px;'>") # Dynamically set width and height
+    html_content <- paste0(html_content, "<div class='scatter-d-zero-line'></div>") # Line for D=0
+
+    # Y-axis tick labels
+    html_content <- paste0(html_content, "<div class='y-axis-tick-label tick-d-1'>1.0</div>")
+    html_content <- paste0(html_content, "<div class='y-axis-tick-label tick-d-0'>0.0</div>")
+    html_content <- paste0(html_content, "<div class='y-axis-tick-label tick-d-neg-1'>-1.0</div>")
+    # X-axis tick labels
+    html_content <- paste0(html_content, "<div class='x-axis-tick-label tick-p-0'>0.0</div>")
+    html_content <- paste0(html_content, "<div class='x-axis-tick-label tick-p-05'>0.5</div>")
+    html_content <- paste0(html_content, "<div class='x-axis-tick-label tick-p-1'>1.0</div>")
+
+    for (q_num in incorrect_q_actual_numbers) {
+      # 從全域變數 diff 和 discim 獲取原始數值
+      # 難度 P (diff) 範圍 0 到 1
+      # 鑑別度 D (discim) 範圍 -1 到 1
+      current_q_difficulty_val <- NA
+      if (q_num <= length(diff)) current_q_difficulty_val <- diff[q_num]
+      
+      current_q_discrimination_val <- NA
+      if (q_num <= length(discim)) current_q_discrimination_val <- discim[q_num]
+
+      if (!is.na(current_q_difficulty_val) && !is.na(current_q_discrimination_val) &&
+          is.finite(current_q_difficulty_val) && is.finite(current_q_discrimination_val)) {
+        
+        # 確保 P 在 [0,1], D 在 [-1,1]
+        p_val <- max(0, min(1, current_q_difficulty_val))
+        d_val <- max(-1, min(1, current_q_discrimination_val))
+
+        # 計算 CSS 位置
+        # X 軸 (難度 P): left 從 0% 到 100%
+        left_percent <- p_val * 100
+        # Y 軸 (鑑別度 D): bottom 從 0% (D=-1) 到 100% (D=1)
+        bottom_percent <- ((d_val + 1) / 2) * 100
+        
+        point_html <- paste0("<div class='scatter-point' style='left:", left_percent, "%; bottom:", bottom_percent, "%;' title='題號:", q_num, ", 難度P:", round(p_val,2) , ", 鑑別度D:", round(d_val,2), "'>", q_num, "</div>")
+        html_content <- paste0(html_content, point_html)
+      }
+    }
+    html_content <- paste0(html_content, "</div></div>") # End scatter-plot-area and scatter-plot-main-area
+    html_content <- paste0(html_content, "<div class='x-axis-label-scatter'>題目難度</div>")
+    html_content <- paste0(html_content, "</div>") # End scatter-plot-container
+  }
+
+  # --- CSS S-P Chart (班級匿名) ---
+  html_content <- paste0(html_content, "<div class='sp-chart-container'>")
+  html_content <- paste0(html_content, "<h4 class='sp-chart-title'>您所在班級 S-P 分析圖 (匿名)</h4>")
+  html_content <- paste0(html_content, "<p style='font-size:0.85em; text-align:center; color:#555;'>此圖顯示您班級同學在各題的作答情況。題目由左至右按通過人數多到少排列，同學由上至下按總分高到低排列。您的作答行已特別標示。</p>")
+
+  # 1. 篩選出該班級的學生
+  class_indices_k <- which(class == student_class_k)
+  if (length(class_indices_k) > 0) {
+    sOX_class_k <- sOX[class_indices_k, , drop = FALSE]
+    sAns_class_k <- sAns[class_indices_k, , drop = FALSE]
+    studentName_class_k <- studentName[class_indices_k]
+    
+    # 2. 排序學生 (高分到低分)
+    class_student_scores_k <- rowSums(sOX_class_k, na.rm = TRUE)
+    class_student_order_k <- order(class_student_scores_k, decreasing = TRUE)
+    sOX_class_ordered_k <- sOX_class_k[class_student_order_k, , drop = FALSE]
+    sAns_class_ordered_k <- sAns_class_k[class_student_order_k, , drop = FALSE]
+    studentName_class_ordered_k <- studentName_class_k[class_student_order_k]
+
+    # 3. 排序題目 (通過人數多到少 / 難度易到難)
+    class_question_pass_counts_k <- colSums(sOX_class_ordered_k, na.rm = TRUE)
+    class_question_order_k <- order(class_question_pass_counts_k, decreasing = TRUE)
+    sOX_class_final_k <- sOX_class_ordered_k[, class_question_order_k, drop = FALSE]
+    sAns_class_final_k <- sAns_class_ordered_k[, class_question_order_k, drop = FALSE]
+    standAns_ordered_k <- standAns[class_question_order_k] # 確保標準答案也跟著題目排序
+    original_q_numbers_ordered_k <- (1:queNum)[class_question_order_k] # 排序後的原始題號
+
+    # 找到目前學生在排序後班級列表中的位置
+    current_student_rank_in_class_k <- which(studentName_class_ordered_k == student_name_k)
+
+    html_content <- paste0(html_content, "<table class='sp-table'><thead><tr><th>生</th>")
+    # 表頭：排序後的題號
+    for(q_idx in 1:ncol(sOX_class_final_k)){
+      html_content <- paste0(html_content, "<th class='sp-q-header'>", original_q_numbers_ordered_k[q_idx] ,"</th>")
+    }
+    html_content <- paste0(html_content, "<th>總</th></tr></thead><tbody>")
+
+    # 表格內容
+    for(s_idx in 1:nrow(sOX_class_final_k)){
+      row_class_attr <- ""
+      if (length(current_student_rank_in_class_k) > 0 && s_idx == current_student_rank_in_class_k[1]) {
+        row_class_attr <- " class='current-student-row'"
+      }
+      html_content <- paste0(html_content, "<tr", row_class_attr, ">")
+      # 學生標示 (匿名，但可以標示當前學生)
+      student_label <- paste0( s_idx)
+      if (length(current_student_rank_in_class_k) > 0 && s_idx == current_student_rank_in_class_k[1]) {
+        student_label <- "<strong>你</strong>"
+      }
+      html_content <- paste0(html_content, "<td>", student_label, "</td>")
+
+      for(q_idx in 1:ncol(sOX_class_final_k)){
+        cell_content <- "&nbsp;" # 預設空白
+        cell_class <- ""
+        is_current_student_cell <- (length(current_student_rank_in_class_k) > 0 && s_idx == current_student_rank_in_class_k[1])
+
+        if (sOX_class_final_k[s_idx, q_idx] == 1) { # 答對
+          cell_class <- "sp-correct" # 預設答對樣式
+          if (is_current_student_cell) {
+            cell_class <- paste(cell_class, "current-student-cell") # 當前學生答對
+            # 對於當前學生答對，cell_content 維持預設的 &nbsp; 或可設為 "✓"
+            # cell_content <- "✓" 
+          } else if (show_classmates_responses_in_sp_chart) { 
+            cell_content <- "&nbsp;" # 其他同學答對，內容留空，依賴背景色，或用 "✓"
+            # cell_content <- "✓"
+          }
+        } else { # 答錯
+          cell_class <- "sp-incorrect" # 預設答錯樣式
+          if (is_current_student_cell) {
+            cell_content <- sAns_class_final_k[s_idx, q_idx]
+            cell_class <- "current-student-incorrect" # 更明顯的錯誤標示
+          } else if (show_classmates_responses_in_sp_chart) {
+            cell_content <- sAns_class_final_k[s_idx, q_idx] # 其他同學答錯，顯示其作答
+          }
+        }
+        html_content <- paste0(html_content, "<td class='", cell_class, "'>", cell_content, "</td>")
+      }
+      html_content <- paste0(html_content, "<td>", class_student_scores_k[class_student_order_k[s_idx]], "</td>") # 該行學生總分
+      html_content <- paste0(html_content, "</tr>")
+    }
+    html_content <- paste0(html_content, "</tbody></table>")
+  } else {
+    html_content <- paste0(html_content, "<p>無法獲取您班級的 S-P 分析圖資料。</p>")
+  }
+  html_content <- paste0(html_content, "</div>") # end sp-chart-container
 
   # 學習風格分析
   student_cs_k <- student[k, "問題注意係數"]
@@ -802,5 +1025,3 @@ for (k in 1:stuNum) {
 }
 
 cat(paste0("\n個別學習報告已全數產生完畢，存放於 '", file.path(getwd(), individual_reports_dir), "' 資料夾中。\n"))
-
-
