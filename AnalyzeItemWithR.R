@@ -1100,7 +1100,7 @@ for (k in 1:stuNum) {
     cat("錯誤：無法寫入學生 ", student_name_k, " 的報告：", e$message, "\n")
   })
   
-  # 打印進度 (可選)
+  # 印進度 (可選)
   if (k %% 10 == 0 || k == stuNum) { # 每10位學生或最後一位學生時打印進度
     cat(paste0("已產生 ", k, " / ", stuNum, " 份報告...\n"))
   }
