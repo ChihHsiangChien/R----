@@ -746,6 +746,7 @@ for (k in 1:stuNum) {
                          ".sp-table tr.current-student-row td { border-top: 2px solid #007bff; border-bottom: 2px solid #007bff; }",
                          ".sp-table td.current-student-cell { font-weight: bold; }",
                          ".sp-table td.current-student-incorrect { background-color: #ffc0cb; color: #a52a2a; font-weight: bold; }", # Pink for current student incorrect 
+                         ".code-map-container { margin-top: 15px; padding: 10px; background-color: #f9f9f9; border: 1px solid #eee; border-radius: 4px; font-size: 0.85em; }",
                          "</style>")
   html_content <- paste0(html_content, "</head><body><div class='container'>")
   
@@ -839,6 +840,24 @@ for (k in 1:stuNum) {
   } else {
     html_content <- paste0(html_content, "<p>恭喜！您所有題目都答對了，或沒有被記錄為錯誤的題目。</p>")
   }
+
+  # --- 作答代號說明 (放在答錯題目詳情表格下方) ---
+  html_content <- paste0(html_content, "<div class='code-map-container'>")
+  html_content <- paste0(html_content, "<h4>作答代號說明：</h4>")
+  html_content <- paste0(html_content, "<ul>")
+  html_content <- paste0(html_content, "<li>F = AB, G = AC, H = AD, I = AE</li>")
+  html_content <- paste0(html_content, "<li>J = BC, K = BD, L = BE</li>")
+  html_content <- paste0(html_content, "<li>M = CD, N = CE</li>")
+  html_content <- paste0(html_content, "<li>O = DE</li>")
+  html_content <- paste0(html_content, "<li>P = ABC, Q = ABD, R = ABE</li>")
+  html_content <- paste0(html_content, "<li>S = ACD, T = ACE, U = ADE</li>")
+  html_content <- paste0(html_content, "<li>V = BCD, W = BCE, X = BDE</li>")
+  html_content <- paste0(html_content, "<li>Y = CDE</li>")
+  html_content <- paste0(html_content, "<li>Z = ABCD, * = ABCE, $ = ABDE, % = ACDE, , = BCDE</li>") # 注意逗號的顯示
+  html_content <- paste0(html_content, "<li># = ABCDE</li>")  
+  html_content <- paste0(html_content, "<li>= (等號) 代表空白或未作答。</li>")
+  html_content <- paste0(html_content, "</ul>")
+  html_content <- paste0(html_content, "</div>")
 
   # --- CSS 散佈圖 (答錯題目之難度 vs 鑑別度) ---
   if (length(incorrect_q_actual_numbers) > 0) {
