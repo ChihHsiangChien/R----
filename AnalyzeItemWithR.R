@@ -318,28 +318,42 @@ for (i in 1:max(class)){
   png(file=paste("學生分析圖",subj,"科",i,"班.png",sep=""), width=2500, height=3500, res=300)
   par(mfrow=c(2,1)) 
  
-  sOX[class==i,]  #class
-  rowSums(sOX[class==i,])  #student score sum
-  classStudent <- length(rowSums(sOX[class==i,]))  #How many student in class 1
-  order(rowSums(sOX[class==i,])) # student score order
-  rev(order(rowSums(sOX[class==i,]))) # student score order High to Low
-  sOX1 <- sOX[class==i,][rev(order(rowSums(sOX[class==i,]))),] #sOX order By student scores
+  # --- S-P Chart for PNG: Data Preparation with Stable Sort ---
+  sOX_class_png <- sOX[class==i, , drop = FALSE]
+  sAns_class_png <- sAns[class==i, , drop = FALSE]
+  studentName_class_png <- studentName[class==i]
+  studentID_class_png <- rownames(sOX_class_png) # Assuming rownames are student IDs
+
+  classStudent <- nrow(sOX_class_png)
+  if (classStudent == 0) {
+    # Handle empty class if necessary, e.g., plot an empty chart or skip
+    plot(0,0,type="n", xlab="", ylab="", main=paste(i,"班的",subj,"科學生問題分析圖 (無學生資料)",sep=""))
+    dev.off() # Close the PNG device for this empty plot
+    next # Skip to the next class
+  }
+
+  # 1. Student Sort (Stable): Score (desc), then Student ID (asc)
+  class_student_scores_png <- rowSums(sOX_class_png, na.rm = TRUE)
+  # Create a data frame for sorting to handle ties
+  # For descending score, use -score. For ascending id, use id directly.
+  class_student_order_png <- order(-class_student_scores_png, studentID_class_png)
   
-  colSums(sOX[class==i,]) #question score sum
-  rev(order(colSums(sOX[class==i,]))) #ordering question High to Low
-  sOX1 <- sOX1[,rev(order(colSums(sOX[class==i,])))]
+  sOX1 <- sOX_class_png[class_student_order_png, , drop = FALSE]
+  sAns_for_SP_png <- sAns_class_png[class_student_order_png, , drop = FALSE] # sAns for SP chart text
+
+  # 2. Question Sort (Stable): Pass count (desc), then Original Question Number (asc)
+  class_question_pass_counts_png <- colSums(sOX1, na.rm = TRUE) # Use sOX1 (already student-sorted) for pass counts
+  original_q_numbers_png <- 1:queNum
+  # For descending pass_count, use -pass_count. For ascending q_num, use q_num directly.
+  class_question_order_png <- order(-class_question_pass_counts_png, original_q_numbers_png)
+
+  sOX1 <- sOX1[, class_question_order_png, drop = FALSE]
+  SP <- sAns_for_SP_png[, class_question_order_png, drop = FALSE] # Apply question order to sAns for SP
+  standAns_ordered_for_SP_png <- standAns[class_question_order_png] # Order standard answers accordingly
   
   #加進作答資訊
-  SP <- sAns[class==i,][order(rowSums(sOX[class==i,])),][,rev(order(colSums(sOX[class==i,])))]
-  colnames(SP)
-  
   for(j in 1:queNum){
-    #j=15 #queNum
-    colnames(SP)==j
-    standAns[j]
-  
-    SP[,colnames(SP)==j][SP[,colnames(SP)==j]==standAns[j]] <- ""  #跟標準答案一樣的，設定為空白
-    SP[,colnames(SP)==j]
+    SP[,j][SP[,j] == standAns_ordered_for_SP_png[j]] <- "" #跟標準答案一樣的，設定為空白
   }
   
   SP
@@ -366,10 +380,10 @@ for (i in 1:max(class)){
   #par()$mar
   
   axis(1,at=seq(1,queNum,1),
-       label=paste(colnames(sOX1),"(",colSums(sOX1),")",sep=""), 
+       label=paste(original_q_numbers_png[class_question_order_png],"(",colSums(sOX1, na.rm=TRUE),")",sep=""), 
        las=2,col="blue",cex.axis=0.8)
   axis(2,at=seq(1,classStudent,1),
-       label=paste(rev(rownames(sOX1)),"(",rev(rowSums(sOX1)),")",sep=""), 
+       label=paste(rev(rownames(sOX1)),"(",rev(rowSums(sOX1, na.rm=TRUE)),")",sep=""),  # Keep rev() here as before
        las=2,col="red",cex.axis=0.8)
   
   
@@ -377,9 +391,10 @@ for (i in 1:max(class)){
   abline(h=seq(1,classStudent),col="lightgrey",lty=3)
   
   queNum
-  for (p in 1:queNum){
-    for(q in 1:classStudent){
-      text(x=p,y=q,labels = SP[q,p],cex=0.8,col='black')
+  for (p in 1:queNum) {
+    for(q in 1:classStudent) {
+      # Use rev(1:classStudent) or (classStudent - q + 1) to align text with correct student order
+      text(x=p, y=(classStudent - q + 1), labels = SP[q, p], cex=0.8, col='black')
     }
   }
 
@@ -632,14 +647,6 @@ if (!exists("aver") || !exists("score") || !exists("subj") || !exists("queNum") 
 }
 
 
-# 建立存放個別報告的資料夾
-individual_reports_dir <- paste0(subj, "_個別學習報告")
-if (!dir.exists(individual_reports_dir)) {
-  dir.create(individual_reports_dir)
-  cat(paste0("已建立資料夾：", file.path(getwd(), individual_reports_dir), "\n"))
-} else {
-  cat(paste0("報告將存放於已存在的資料夾：", file.path(getwd(), individual_reports_dir), "\n"))
-}
 
 
 cat("開始產生個別學習報告...\n")
@@ -648,6 +655,17 @@ for (k in 1:stuNum) {
   student_id_k <- rownames(cardReading)[k] # 學號 (來自 cardReading 的 row.names)
   student_class_k <- student[k, "班級"]
   student_seat_number_k <- student[k, "座號"]
+
+  # --- 根據班級建立個別報告的子資料夾 ---
+  # 確保班級名稱在路徑中是安全的
+  safe_class_name_k <- gsub("[^A-Za-z0-9_\\-]", "_", as.character(student_class_k))
+  class_specific_reports_dir <- file.path(paste0(subj, "_個別學習報告"), paste0("班級_", safe_class_name_k))
+  
+  if (!dir.exists(class_specific_reports_dir)) {
+    dir.create(class_specific_reports_dir, recursive = TRUE) # recursive = TRUE 會一併建立父資料夾 (如果不存在)
+    cat(paste0("已為班級 ", student_class_k, " 建立資料夾：", file.path(getwd(), class_specific_reports_dir), "\n"))
+  }
+  # ------------------------------------
   
   # 確保 sOX 的 rowname 與 studentName[k] 或 student[k,"姓名"] 對應
   # 假設 sOX 的 rownames 就是 studentName
@@ -886,21 +904,28 @@ for (k in 1:stuNum) {
     sOX_class_k <- sOX[class_indices_k, , drop = FALSE]
     sAns_class_k <- sAns[class_indices_k, , drop = FALSE]
     studentName_class_k <- studentName[class_indices_k]
+    studentID_class_k <- rownames(sOX_class_k) # Assuming rownames are student IDs
     
-    # 2. 排序學生 (高分到低分)
+    # 2. 排序學生 (高分到低分) - Stable Sort
     class_student_scores_k <- rowSums(sOX_class_k, na.rm = TRUE)
-    class_student_order_k <- order(class_student_scores_k, decreasing = TRUE)
+    # Create a data frame for sorting to handle ties
+    # For descending score, use -score. For ascending id, use id directly.
+    class_student_order_k <- order(-class_student_scores_k, studentID_class_k)
+    
     sOX_class_ordered_k <- sOX_class_k[class_student_order_k, , drop = FALSE]
     sAns_class_ordered_k <- sAns_class_k[class_student_order_k, , drop = FALSE]
     studentName_class_ordered_k <- studentName_class_k[class_student_order_k]
 
-    # 3. 排序題目 (通過人數多到少 / 難度易到難)
-    class_question_pass_counts_k <- colSums(sOX_class_ordered_k, na.rm = TRUE)
-    class_question_order_k <- order(class_question_pass_counts_k, decreasing = TRUE)
+    # 3. 排序題目 (通過人數多到少 / 難度易到難) - Stable Sort
+    class_question_pass_counts_k <- colSums(sOX_class_ordered_k, na.rm = TRUE) # Use student-ordered sOX for pass counts
+    original_q_numbers_html <- 1:queNum
+    # For descending pass_count, use -pass_count. For ascending q_num, use q_num directly.
+    class_question_order_k <- order(-class_question_pass_counts_k, original_q_numbers_html)
+    
     sOX_class_final_k <- sOX_class_ordered_k[, class_question_order_k, drop = FALSE]
     sAns_class_final_k <- sAns_class_ordered_k[, class_question_order_k, drop = FALSE]
     standAns_ordered_k <- standAns[class_question_order_k] # 確保標準答案也跟著題目排序
-    original_q_numbers_ordered_k <- (1:queNum)[class_question_order_k] # 排序後的原始題號
+    original_q_numbers_ordered_k <- original_q_numbers_html[class_question_order_k] # 排序後的原始題號
 
     # 找到目前學生在排序後班級列表中的位置
     current_student_rank_in_class_k <- which(studentName_class_ordered_k == student_name_k)
@@ -1007,7 +1032,7 @@ for (k in 1:stuNum) {
   safe_student_name_k <- gsub("[^A-Za-z0-9_\\-\\.\u4e00-\u9fa5]", "_", student_name_k) # 保留中文
   safe_student_id_k <- gsub("[^A-Za-z0-9_\\-\\.]", "_", student_id_k)
   
-  report_filename <- file.path(individual_reports_dir, paste0(subj, "_", safe_student_id_k, "_", safe_student_name_k, "_學習分析報告.html"))
+  report_filename <- file.path(class_specific_reports_dir, paste0(subj, "_", safe_student_id_k, "_", safe_student_name_k, "_學習分析報告.html"))
   
   tryCatch({
     # 使用 con <- file(..., encoding = "UTF-8") 來確保正確寫入中文
@@ -1024,4 +1049,4 @@ for (k in 1:stuNum) {
   }
 }
 
-cat(paste0("\n個別學習報告已全數產生完畢，存放於 '", file.path(getwd(), individual_reports_dir), "' 資料夾中。\n"))
+cat(paste0("\n個別學習報告已全數產生完畢，存放於 '", file.path(getwd(), paste0(subj, "_個別學習報告")), "' 主資料夾下的各班級子資料夾中。\n"))
