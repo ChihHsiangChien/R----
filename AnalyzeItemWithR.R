@@ -1,10 +1,52 @@
 setwd("/media/pancala/3T/試題分析/0test")
 #windows 用以下路徑
 #setwd("C:/Users/user/Desktop/test")  
-cardReading <-read.table("test.txt",header=TRUE,row.names="學號",fill = TRUE , sep="\t",as.is=T )
+cardReading <-read.table("test.txt",header=TRUE,fill = TRUE , sep="\t",as.is=T )
 
 
-colnames(cardReading) <- c("subjectCode","subjectName","grade","class","number","studentName","score","studentAnswer")
+#colnames(cardReading) <- c("subjectCode","subjectName","grade","class","number","studentName","score","studentAnswer")
+colnames(cardReading) <- c("subjectName","grade","class","number","studentName","score","studentAnswer")
+
+
+# --- 組合班級和座號作為學號 ---
+# 確保班級和座號是整數，以便 sprintf 正確格式化
+cardReading$class <- as.integer(cardReading$class)
+cardReading$number <- as.integer(cardReading$number) # 假設 'number' 是座號欄位
+
+
+# ---------------------------------
+
+# --- 讀取資優班名單並處理 ---
+giftedStudents <- read.table("giftedStudents.txt", header = TRUE, sep = "\t", as.is = TRUE)
+
+# 找出 cardReading 中對應資優班名單的學生
+gifted_indices <- which(with(cardReading, paste(class, number, studentName, sep = "_")) %in%
+                           with(giftedStudents, paste(班級, 座號, 姓名, sep = "_")))
+
+if (length(gifted_indices) > 0) {
+  # 建立資優班學生的 cardReading 子集
+  giftedCardReading <- cardReading[gifted_indices, ]
+  
+  # 設定新的班級代碼給資優班 (比原本最大班級數多 1)
+  new_class_code <- max(cardReading$class) + 1
+  giftedCardReading$class <- new_class_code
+
+  # 為資優班學生重新編排座號 (從1開始，按照giftedStudents.txt中的順序)
+  # 假設 gifted_indices 是按照 giftedStudents.txt 順序找到的
+  giftedCardReading$number <- 1:nrow(giftedCardReading)
+  
+
+  # 將資優班學生資料合併到原 cardReading 中
+  cardReading <- rbind(cardReading, giftedCardReading)
+  
+  cat(paste0("已將 ", length(gifted_indices), " 位資優班學生資料合併到主資料中，班級代碼為：", new_class_code, "\n"))
+} else {
+  cat("警告：在主資料中找不到任何符合資優班名單的學生，請檢查名單。\n")
+}
+# --------------------------------------------------
+
+cardReading$學號 <- sprintf("%02d%02d", cardReading$class, cardReading$number)
+
 attach(cardReading)
 
 aver <-tapply(score,class,mean,na.rm=TRUE)
@@ -754,21 +796,20 @@ for (k in 1:stuNum) {
   html_content <- paste0(html_content, "<h2>科目：", subj, "</h2>")
   html_content <- paste0(html_content, "<div class='info-box'>",
                          "<p><b>學生：</b>", student_name_k, "</p>",
-                         "<p><b>學號：</b>", student_id_k, "</p>",
-                         "<p><b>班級：</b>", student_class_k, "班</p>",
+                         "<p><b>班級：</b>", student_class_k, "</p>",
                          "<p><b>座號：</b>", student_seat_number_k, "</p>",
                          "</div>")
 
   # 整體表現摘要
   html_content <- paste0(html_content, "<h3>整體表現摘要</h3><ul>")
-  html_content <- paste0(html_content, "<li><b>您的得分 (答對題數/總題數)：</b>", student_num_correct_k, " / ", queNum, 
-                         " (答對率: ", round(student_correct_rate_k * 100, 1), "%)</li>")
+  html_content <- paste0(html_content, "<li><b>總題數：</b>",queNum," 題</ll>")
+  html_content <- paste0(html_content, "<li><b>您的答對題數：</b>", student_num_correct_k, " 題</li>")
   if (!is.na(class_avg_k) && length(class_avg_k) > 0) {
-    html_content <- paste0(html_content, "<li><b>您班級的平均得分：</b>", round(class_avg_k, 1), " 分 (全班 ", length(score[class==student_class_k & !is.na(score)]), " 班)</li>")
+    html_content <- paste0(html_content, "<li><b>您班級的平均答對題數：</b>", round(class_avg_k/100*queNum, 1), " 題 </li>")
   } else {
-    html_content <- paste0(html_content, "<li><b>您班級的平均得分：</b>資料暫缺</li>")
+    html_content <- paste0(html_content, "<li><b>您班級的平均答對題數：</b>資料暫缺</li>")
   }
-  html_content <- paste0(html_content, "<li><b>全體平均得分：</b>", round(overall_avg, 1), " 分 (全體 ", length(score[!is.na(score)]), " 位)</li>")
+  html_content <- paste0(html_content, "<li><b>全體平均答對題數：</b>", round(overall_avg/100*queNum, 1), " 題</li>")
   html_content <- paste0(html_content, "</ul>")
 
   # --- CSS 長條圖 ---
@@ -783,19 +824,19 @@ for (k in 1:stuNum) {
   }
 
   html_content <- paste0(html_content, "<div class='chart-container'><h4>成績比較圖 (答對率 %)</h4>")
-  # 您的答對率
+  # 您的答對題數
   html_content <- paste0(html_content, "<div class='chart-bar-group'>")
   html_content <- paste0(html_content, "<span class='bar-label'>您的答對率:</span>")
   html_content <- paste0(html_content, "<div class='bar-wrapper'><div class='bar student-bar' style='width:", student_rate_percent, "%;'>", student_rate_percent, "%</div></div>")
   html_content <- paste0(html_content, "</div>")
-  # 班級平均答對率
+  # 班級平均答對題數
   if (!is.na(class_avg_rate_percent)) {
     html_content <- paste0(html_content, "<div class='chart-bar-group'>")
     html_content <- paste0(html_content, "<span class='bar-label'>班級平均答對率:</span>")
     html_content <- paste0(html_content, "<div class='bar-wrapper'><div class='bar class-bar' style='width:", class_avg_rate_percent, "%;'>", class_avg_rate_percent, "%</div></div>")
     html_content <- paste0(html_content, "</div>")
   }
-  # 全體平均答對率
+  # 全體平均答對題數
   if (!is.na(overall_avg_rate_percent)) {
     html_content <- paste0(html_content, "<div class='chart-bar-group'>")
     html_content <- paste0(html_content, "<span class='bar-label'>全體平均答對率:</span>")
@@ -845,14 +886,8 @@ for (k in 1:stuNum) {
   html_content <- paste0(html_content, "<div class='code-map-container'>")
   html_content <- paste0(html_content, "<h4>作答代號說明：</h4>")
   html_content <- paste0(html_content, "<ul>")
-  html_content <- paste0(html_content, "<li>F = AB, G = AC, H = AD, I = AE</li>")
-  html_content <- paste0(html_content, "<li>J = BC, K = BD, L = BE</li>")
-  html_content <- paste0(html_content, "<li>M = CD, N = CE</li>")
-  html_content <- paste0(html_content, "<li>O = DE</li>")
-  html_content <- paste0(html_content, "<li>P = ABC, Q = ABD, R = ABE</li>")
-  html_content <- paste0(html_content, "<li>S = ACD, T = ACE, U = ADE</li>")
-  html_content <- paste0(html_content, "<li>V = BCD, W = BCE, X = BDE</li>")
-  html_content <- paste0(html_content, "<li>Y = CDE</li>")
+  html_content <- paste0(html_content, "<li>F = AB, G = AC, H = AD, I = AE, J = BC, K = BD, L = BE, M = CD, N = CE, O = DE</li>")
+  html_content <- paste0(html_content, "<li>P = ABC, Q = ABD, R = ABE, S = ACD, T = ACE, U = ADE, V = BCD, W = BCE, X = BDE, Y = CDE</li>")
   html_content <- paste0(html_content, "<li>Z = ABCD, * = ABCE, $ = ABDE, % = ACDE, , = BCDE</li>") # 注意逗號的顯示
   html_content <- paste0(html_content, "<li># = ABCDE</li>")  
   html_content <- paste0(html_content, "<li>= (等號) 代表空白或未作答。</li>")
@@ -861,7 +896,7 @@ for (k in 1:stuNum) {
 
   # --- CSS 散佈圖 (答錯題目之難度 vs 鑑別度) ---
   if (length(incorrect_q_actual_numbers) > 0) {
-    plot_width_px <- 600
+    plot_width_px <- 800
     plot_height_px <- 400
 
     html_content <- paste0(html_content, "<div class='scatter-plot-container'>")
@@ -1051,10 +1086,13 @@ for (k in 1:stuNum) {
   safe_student_name_k <- gsub("[^A-Za-z0-9_\\-\\.\u4e00-\u9fa5]", "_", student_name_k) # 保留中文
   safe_student_id_k <- gsub("[^A-Za-z0-9_\\-\\.]", "_", student_id_k)
   
-  report_filename <- file.path(class_specific_reports_dir, paste0(subj, "_", safe_student_id_k, "_", safe_student_name_k, "_學習分析報告.html"))
+  # 格式化班級和座號為兩位數字字符串
+  formatted_class_k <- sprintf("%02d", as.integer(student_class_k))
+  formatted_seat_k <- sprintf("%02d", as.integer(student_seat_number_k))
+
+  report_filename <- file.path(class_specific_reports_dir, paste0(subj, "_", formatted_class_k, formatted_seat_k, "_", safe_student_name_k, "_學習分析報告.html"))
   
   tryCatch({
-    # 使用 con <- file(..., encoding = "UTF-8") 來確保正確寫入中文
     con <- file(report_filename, "w", encoding = "UTF-8")
     writeLines(html_content, con, useBytes = FALSE) # useBytes = FALSE 配合 encoding
     close(con)
